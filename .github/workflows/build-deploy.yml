@@ -71,7 +71,7 @@ jobs:
       - name: Deploy to NAS
         env:
           NAS_HOST: nas.chriscastrotech.internal
-          NAS_USER: ccastro
+          NAS_USER: admin
           NAS_DEPLOY_PATH: /share/ZFS531_DATA/.qpkg/QNAPExporter/qnapexporter
         run: |
           chmod +x ./bin/qnapexporter
