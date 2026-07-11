@@ -71,27 +71,27 @@ jobs:
       - name: Deploy to NAS
         env:
           NAS_HOST: nas.chriscastrotech.internal
-          NAS_USER: ccastro
+          NAS_USER: admin
           NAS_DEPLOY_PATH: /share/ZFS531_DATA/.qpkg/QNAPExporter/qnapexporter
         run: |
           chmod +x ./bin/qnapexporter
           SSH_OPTS="-o StrictHostKeyChecking=no -o PubkeyAuthentication=no -o PreferredAuthentications=password"
 
           echo "Uploading binary to NAS /tmp..."
-          sshpass -p "${{ secrets.NAS_PASSWORD }}" \
+          sshpass -p "${{ secrets.NAS_ADMIN_PASSWORD }}" \
             scp ${SSH_OPTS} \
             ./bin/qnapexporter \
             ${NAS_USER}@${NAS_HOST}:/tmp/qnapexporter-new
 
           echo "Stopping service, replacing binary, starting service..."
-          sshpass -p "${{ secrets.NAS_PASSWORD }}" \
+          sshpass -p "${{ secrets.NAS_ADMIN_PASSWORD }}" \
             ssh ${SSH_OPTS} \
             ${NAS_USER}@${NAS_HOST} \
-            "/etc/init.d/qnapexporter.sh stop; sleep 2; cat /tmp/qnapexporter-new > ${NAS_DEPLOY_PATH}; chmod +x ${NAS_DEPLOY_PATH}; /etc/init.d/qnapexporter.sh start; rm -f /tmp/qnapexporter-new"
+            "killall qnapexporter 2>/dev/null; sleep 2; cp /tmp/qnapexporter-new ${NAS_DEPLOY_PATH} && chmod +x ${NAS_DEPLOY_PATH} && /etc/init.d/qnapexporter.sh start && rm -f /tmp/qnapexporter-new"
 
           echo "Verifying volume metrics..."
           sleep 5
-          VOLUMES=$(sshpass -p "${{ secrets.NAS_PASSWORD }}" \
+          VOLUMES=$(sshpass -p "${{ secrets.NAS_ADMIN_PASSWORD }}" \
             ssh ${SSH_OPTS} \
             ${NAS_USER}@${NAS_HOST} \
             "curl -s http://localhost:9094/metrics | grep -c node_volume" || echo "0")
