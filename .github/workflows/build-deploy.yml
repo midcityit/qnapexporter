@@ -1,0 +1,100 @@
+---
+name: Build & Deploy qnapexporter (QuTS hero)
+
+on:
+  push:
+    branches:
+      - fix/quts-hero-volume-support
+      - main
+  workflow_dispatch:
+
+env:
+  BINARY_NAME: qnapexporter
+  GOOS: linux
+  GOARCH: amd64
+
+jobs:
+  build:
+    runs-on: [self-hosted, linux, homelab]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build binary
+        run: |
+          REVISION="$(git rev-parse --short=8 HEAD)"
+          BRANCH="$(git branch --show-current)"
+          BUILT="$(date -u +%Y-%m-%dT%H:%M:%S%z)"
+          VERSION="${GITHUB_REF_NAME}-${REVISION}"
+
+          VERSION_PKG="github.com/pedropombeiro/qnapexporter/lib/utils"
+          GO_LDFLAGS="-X ${VERSION_PKG}.REVISION=${REVISION} -X ${VERSION_PKG}.BUILT=${BUILT} -X ${VERSION_PKG}.BRANCH=${BRANCH} -X ${VERSION_PKG}.VERSION=${VERSION} -s -w"
+
+          echo "Building qnapexporter for ${GOOS}/${GOARCH}..."
+          CGO_ENABLED=0 go build -mod=readonly -ldflags "${GO_LDFLAGS}" -o bin/${BINARY_NAME} .
+          echo "Build complete"
+          ls -la bin/${BINARY_NAME}
+          file bin/${BINARY_NAME}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: qnapexporter-linux-amd64
+          path: bin/qnapexporter
+          retention-days: 90
+
+  deploy:
+    runs-on: [self-hosted, linux, homelab]
+    needs: build
+    if: github.ref == 'refs/heads/fix/quts-hero-volume-support' || github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: qnapexporter-linux-amd64
+          path: ./bin
+
+      - name: Deploy to NAS
+        env:
+          NAS_HOST: nas.chriscastrotech.internal
+          NAS_USER: ccastro
+          NAS_DEPLOY_PATH: /share/ZFS531_DATA/.qpkg/QNAPExporter/qnapexporter
+        run: |
+          chmod +x ./bin/qnapexporter
+
+          echo "Deploying to ${NAS_HOST}..."
+          sshpass -p "${{ secrets.NAS_PASSWORD }}" \
+            scp -o StrictHostKeyChecking=no -o PubkeyAuthentication=no -o PreferredAuthentications=password \
+            ./bin/qnapexporter \
+            ${NAS_USER}@${NAS_HOST}:${NAS_DEPLOY_PATH}
+
+          echo "Restarting exporter service..."
+          sshpass -p "${{ secrets.NAS_PASSWORD }}" \
+            ssh -o StrictHostKeyChecking=no -o PubkeyAuthentication=no -o PreferredAuthentications=password \
+            ${NAS_USER}@${NAS_HOST} \
+            "/etc/init.d/qnapexporter.sh restart"
+
+          echo "Verifying volume metrics..."
+          sleep 3
+          VOLUMES=$(sshpass -p "${{ secrets.NAS_PASSWORD }}" \
+            ssh -o StrictHostKeyChecking=no -o PubkeyAuthentication=no -o PreferredAuthentications=password \
+            ${NAS_USER}@${NAS_HOST} \
+            "curl -s http://localhost:9094/metrics | grep -c node_volume")
+
+          echo "Volume metric lines: ${VOLUMES}"
+          if [ "${VOLUMES}" -gt 0 ]; then
+            echo "✅ Volume metrics are now being collected!"
+          else
+            echo "❌ No volume metrics found — fix may not be working"
+            exit 1
+          fi
