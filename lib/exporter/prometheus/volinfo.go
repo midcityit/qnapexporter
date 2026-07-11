@@ -53,9 +53,11 @@ func (e *promExporter) readSysVolInfo() {
 			continue
 		}
 		e.Logger.Printf("Retrieved volume %q vol_fs %q", description, fileSystem)
+		// QuTS hero (ZFS-based) reports "Unknown" for all volumes since ZFS datasets
+		// don't map to traditional filesystem names in getsysinfo. Treat as "zfs".
 		if fileSystem == "Unknown" {
-			e.Logger.Printf("Ignoring %q volume with %s file system", description, fileSystem)
-			continue
+			fileSystem = "zfs"
+			e.Logger.Printf("Volume %q has unknown filesystem, assuming ZFS (QuTS hero)", description)
 		}
 
 		volsizeStr, err := utils.ExecCommand(e.getsysinfo, "vol_totalsize", volIdx)
@@ -152,7 +154,9 @@ func parseVolDesc(desc string) string {
 		return desc
 	}
 
-	return strings.SplitN(strings.TrimSpace(desc[index:]), ",", 2)[0]
+	name := strings.SplitN(strings.TrimSpace(desc[index:]), ",", 2)[0]
+	// Trim trailing bracket for cases like "[Volume MyVol]" (no pool info)
+	return strings.TrimSuffix(strings.TrimSpace(name), "]")
 }
 
 func parseVolSize(s string) (float64, error) {
