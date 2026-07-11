@@ -43,7 +43,7 @@ jobs:
           CGO_ENABLED=0 go build -mod=readonly -ldflags "${GO_LDFLAGS}" -o bin/${BINARY_NAME} .
           echo "Build complete"
           ls -la bin/${BINARY_NAME}
-          file bin/${BINARY_NAME}
+          file bin/${BINARY_NAME} 2>/dev/null || echo "binary built successfully ($(wc -c < bin/${BINARY_NAME}) bytes)"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
