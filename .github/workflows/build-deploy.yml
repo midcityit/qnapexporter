@@ -75,25 +75,26 @@ jobs:
           NAS_DEPLOY_PATH: /share/ZFS531_DATA/.qpkg/QNAPExporter/qnapexporter
         run: |
           chmod +x ./bin/qnapexporter
+          SSH_OPTS="-o StrictHostKeyChecking=no -o PubkeyAuthentication=no -o PreferredAuthentications=password"
 
           echo "Deploying to ${NAS_HOST}..."
           sshpass -p "${{ secrets.NAS_PASSWORD }}" \
-            scp -o StrictHostKeyChecking=no -o PubkeyAuthentication=no -o PreferredAuthentications=password \
+            scp ${SSH_OPTS} \
             ./bin/qnapexporter \
-            ${NAS_USER}@${NAS_HOST}:${NAS_DEPLOY_PATH}
+            ${NAS_USER}@${NAS_HOST}:/tmp/qnapexporter-new
 
-          echo "Restarting exporter service..."
+          echo "Installing binary and restarting service..."
           sshpass -p "${{ secrets.NAS_PASSWORD }}" \
-            ssh -o StrictHostKeyChecking=no -o PubkeyAuthentication=no -o PreferredAuthentications=password \
+            ssh ${SSH_OPTS} \
             ${NAS_USER}@${NAS_HOST} \
-            "/etc/init.d/qnapexporter.sh restart"
+            "cp /tmp/qnapexporter-new ${NAS_DEPLOY_PATH} && chmod +x ${NAS_DEPLOY_PATH} && /etc/init.d/qnapexporter.sh restart && rm /tmp/qnapexporter-new"
 
           echo "Verifying volume metrics..."
-          sleep 3
+          sleep 5
           VOLUMES=$(sshpass -p "${{ secrets.NAS_PASSWORD }}" \
-            ssh -o StrictHostKeyChecking=no -o PubkeyAuthentication=no -o PreferredAuthentications=password \
+            ssh ${SSH_OPTS} \
             ${NAS_USER}@${NAS_HOST} \
-            "curl -s http://localhost:9094/metrics | grep -c node_volume")
+            "curl -s http://localhost:9094/metrics | grep -c node_volume" || echo "0")
 
           echo "Volume metric lines: ${VOLUMES}"
           if [ "${VOLUMES}" -gt 0 ]; then
