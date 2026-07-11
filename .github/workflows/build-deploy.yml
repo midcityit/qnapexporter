@@ -64,6 +64,10 @@ jobs:
           name: qnapexporter-linux-amd64
           path: ./bin
 
+      - name: Install sshpass
+        run: |
+          which sshpass || (sudo apt-get update -qq && sudo apt-get install -y -qq sshpass)
+
       - name: Deploy to NAS
         env:
           NAS_HOST: nas.chriscastrotech.internal
