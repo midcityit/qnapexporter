@@ -1,5 +1,10 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["local>midcityit/github-tf:renovate-config"],
-  "ignorePaths": ["vendor/**"]
+  "extends": [
+    "local>midcityit/github-tf:renovate-config"
+  ],
+  "forkProcessing": "enabled",
+  "ignorePaths": [
+    "vendor/**"
+  ]
 }
