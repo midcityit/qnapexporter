@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -60,6 +61,7 @@ type promExporter struct {
 
 	volumes         []volumeInfo
 	volumeLastFetch time.Time
+	volumeExcludeRe *regexp.Regexp
 
 	dmCacheClients           []string
 	dmCacheDeviceMinorNumber string
@@ -71,7 +73,12 @@ type promExporter struct {
 // ExporterConfig holds the configuration options for the Prometheus exporter.
 type ExporterConfig struct {
 	PingTarget string
-	Logger     *log.Logger
+	// VolumeExclude is an optional regular expression matched against each
+	// volume's parsed description. Matching volumes are skipped entirely
+	// (no metrics, and their getsysinfo calls are not made). Empty disables
+	// filtering, preserving the default behavior of exporting every volume.
+	VolumeExclude string
+	Logger        *log.Logger
 }
 
 // NewExporter creates a Prometheus exporter using the given configuration and
@@ -82,6 +89,14 @@ func NewExporter(config ExporterConfig, status *exporter.Status) exporter.Export
 		ExporterConfig: config,
 		status:         status,
 		envExpiry:      now,
+	}
+	if config.VolumeExclude != "" {
+		re, err := regexp.Compile(config.VolumeExclude)
+		if err != nil && config.Logger != nil {
+			config.Logger.Printf("Invalid volume-exclude regexp %q, disabling volume filter: %v", config.VolumeExclude, err)
+		} else {
+			e.volumeExcludeRe = re
+		}
 	}
 	e.fns = map[string]fetchMetricFn{
 		"version":         e.getVersionMetrics,

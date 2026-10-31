@@ -51,6 +51,7 @@ func run() (exitCode int) {
 
 	port := flag.String("port", ":9094", "Port to serve at (e.g. :9094).")
 	pingTarget := flag.String("ping-target", "", "Host to periodically ping (e.g. 1.1.1.1).")
+	volumeExclude := flag.String("volume-exclude", os.Getenv("VOLUME_EXCLUDE"), "Regexp matched against volume names; matching volumes are excluded from metrics (e.g. '^trident-pvc-'). Empty exports all volumes. Also settable via VOLUME_EXCLUDE.")
 	healthcheck := flag.String("healthcheck", os.Getenv("HEALTHCHECK_CONFIG"), "Healthcheck service to ping every 5 minutes (currently supported: healthchecks.io:<check-id>).")
 	grafanaURL := flag.String("grafana-url", os.Getenv("GRAFANA_URL"), "Grafana host (e.g.: https://grafana.example.com).")
 	grafanaAuthToken := flag.String("grafana-auth-token", os.Getenv("GRAFANA_AUTH_TOKEN"), "Grafana authorization token.")
@@ -99,8 +100,9 @@ func run() (exitCode int) {
 	}
 
 	config := prometheus.ExporterConfig{
-		PingTarget: *pingTarget,
-		Logger:     logger,
+		PingTarget:    *pingTarget,
+		VolumeExclude: *volumeExclude,
+		Logger:        logger,
 	}
 	e := prometheus.NewExporter(config, &serverStatus.ExporterStatus)
 
