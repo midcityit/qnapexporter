@@ -3,10 +3,16 @@
 package utils
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
+
+// execTimeout bounds every external command so a hung helper (e.g. a stalled
+// getsysinfo on QuTS hero) cannot block a scrape indefinitely.
+const execTimeout = 10 * time.Second
 
 // ReadFile reads the entire contents of a file as a string
 func ReadFile(f string) (string, error) {
@@ -35,7 +41,10 @@ func ExecCommand(cmd string, args ...string) (string, error) {
 		output []byte
 	)
 
-	c := exec.Command(cmd, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), execTimeout)
+	defer cancel()
+
+	c := exec.CommandContext(ctx, cmd, args...)
 	if output, err = c.Output(); err != nil {
 		return "", err
 	}
