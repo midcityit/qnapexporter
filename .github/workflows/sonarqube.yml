@@ -8,7 +8,7 @@ name: SonarQube
 
 on:
   push:
-    branches: [master, feat/mcit-457-sonarqube] # TEMP: feat branch removed after the first green run
+    branches: [master]
   workflow_dispatch:
 
 permissions:
