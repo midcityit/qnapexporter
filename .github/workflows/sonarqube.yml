@@ -1,0 +1,38 @@
+# SonarQube Community Build scan (epic MCIT-457).
+# Runs on the in-cluster runners (label mcit-k8s) so it can reach the server by
+# its Service name; the public host (Access-protected) is not used by CI.
+# Community Build analyzes the default branch only (no PR analysis), so this runs on
+# pushes to master. A failed quality gate fails the job when repo variable
+# SONAR_ENFORCE is 'true'. Runbook: Confluence MCIT page 36110388.
+name: SonarQube
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sonarqube-${{ github.repository }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    runs-on: [self-hosted, mcit-k8s, amd64]
+    timeout-minutes: 30
+    continue-on-error: ${{ vars.SONAR_ENFORCE != 'true' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: SonarQube scan
+        uses: SonarSource/sonarqube-scan-action@59202af334b4ba7b5db01b701b8e79f8b3bef0f4 # v8.5.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300
