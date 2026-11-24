@@ -1,0 +1,4 @@
+self-hosted-runner:
+  labels:
+    - mcit-k8s
+    - amd64
